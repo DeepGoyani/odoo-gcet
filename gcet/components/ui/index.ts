@@ -18,3 +18,6 @@ export { StatusBadge, StatusIndicator, CountBadge } from './status-badge';
 
 // Utility Components
 export { LoadingSpinner, EmptyState } from './ui';
+
+// File Upload Component
+export { default as FileUpload } from '../FileUpload';
