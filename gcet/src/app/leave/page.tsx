@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Download } from 'lucide-react';
-import NotificationBell from '@/components/NotificationBell';
 import { useToastListener } from '@/hooks/useToastListener';
-import { LoadingState, EmptyState, PageLoading } from '@/components/ui';
 
 interface LeaveRequest {
   id: string;
@@ -19,38 +17,14 @@ interface LeaveRequest {
   approverComments?: string;
 }
 
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-}
-
 export default function LeavePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showNewForm, setShowNewForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Initialize toast listener
   useToastListener();
-
-  const fetchUser = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      } else {
-        router.push('/auth/login');
-      }
-    } catch (error) {
-      router.push('/auth/login');
-    }
-  };
 
   const fetchLeaveRequests = async () => {
     try {
@@ -67,48 +41,12 @@ export default function LeavePage() {
   };
 
   useEffect(() => {
-    fetchUser();
     fetchLeaveRequests();
   }, []);
-
-  const handleApprove = async (leaveId: string) => {
-    try {
-      const response = await fetch(`/api/leaves/${leaveId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          approverComments: 'Approved by HR',
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        fetchLeaveRequests();
-        
-        // Show toast notification if returned by API
-        if (data.toast) {
-          const { showSuccessToast } = await import('@/contexts/ToastContext').then(mod => ({ showSuccessToast: mod.useToast().showSuccessToast }));
-          // We'll need to call this from a component that has access to the hook
-          window.dispatchEvent(new CustomEvent('showToast', { detail: data.toast }));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to approve leave:', error);
-    }
-  };
 
   const handleExportLeave = async () => {
     try {
       const params = new URLSearchParams();
-      
-      // Add filters if needed
-      if (user && user.role !== 'employee') {
-        // For HR/Admin, you might want to export specific user data
-        // For now, export all data for current user role
-      }
-      
       const response = await fetch(`/api/export/leave?${params.toString()}`);
       
       if (response.ok) {
@@ -126,32 +64,6 @@ export default function LeavePage() {
       }
     } catch (error) {
       console.error('Export error:', error);
-    }
-  };
-
-  const handleReject = async (leaveId: string) => {
-    try {
-      const response = await fetch(`/api/leaves/${leaveId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          approverComments: 'Rejected by HR',
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        fetchLeaveRequests();
-        
-        // Show toast notification if returned by API
-        if (data.toast) {
-          window.dispatchEvent(new CustomEvent('showToast', { detail: data.toast }));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to reject leave:', error);
     }
   };
 
@@ -201,10 +113,6 @@ export default function LeavePage() {
     );
   }
 
-  if (!user) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
@@ -248,18 +156,17 @@ export default function LeavePage() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <NotificationBell userId={user?.id || ''} />
-              </div>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <div className="flex items-center">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
               </div>
             </div>
           </div>
@@ -271,112 +178,48 @@ export default function LeavePage() {
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {user.role === 'employee' ? 'For Employees View' : 'Time Off'}
-              </h1>
-              
-              <div className="flex items-center space-x-4">
-                {user.role === 'employee' && (
-                  <button
-                    onClick={() => setShowNewForm(!showNewForm)}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>NEW</span>
-                  </button>
-                )}
-                
-                {/* Export Button */}
-                <button
-                  onClick={handleExportLeave}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export CSV</span>
-                </button>
+              <h1 className="text-2xl font-bold text-gray-900">Time Off</h1>
+              {/* New Request Button */}
+              <button
+                onClick={() => router.push('/leave/new')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>NEW</span>
+              </button>
+              {/* Export Button */}
+              <button
+                onClick={handleExportLeave}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+              >
+                <Download className="h-4 w-4" />
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+          {/* Leave Summary */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Paid time Off</p>
+                    <p className="text-2xl font-bold text-green-600">24 Days Available</p>
+                  </div>
+                  <Calendar className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Sick time off</p>
+                    <p className="text-2xl font-bold text-blue-600">07 Days Available</p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-600" />
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Leave Summary */}
-          {user.role === 'employee' && (
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Paid time Off</p>
-                      <p className="text-2xl font-bold text-green-600">24 Days Available</p>
-                    </div>
-                    <Calendar className="h-8 w-8 text-green-600" />
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Sick time off</p>
-                      <p className="text-2xl font-bold text-blue-600">07 Days Available</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* New Leave Form */}
-          {showNewForm && user.role === 'employee' && (
-            <div className="px-6 py-4 bg-blue-50 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Apply for Leave</h3>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="paid">Paid Time Off</option>
-                    <option value="sick">Sick Leave</option>
-                    <option value="unpaid">Unpaid Leave</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="Enter reason for leave..."
-                  />
-                </div>
-                <div className="md:col-span-2 flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewForm(false)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
 
           {/* Leave Requests Table */}
           <div className="px-6 py-4">
@@ -384,14 +227,8 @@ export default function LeavePage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time off Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    {(user.role === 'admin' || user.role === 'hr') && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -417,26 +254,6 @@ export default function LeavePage() {
                           </span>
                         </div>
                       </td>
-                      {(user.role === 'admin' || user.role === 'hr') && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {request.status === 'pending' && (
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleApprove(request.id)}
-                                className="text-green-600 hover:text-green-900"
-                              >
-                                <CheckCircle className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => handleReject(request.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <XCircle className="h-5 w-5" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
