@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, ChevronLeft, ChevronRight, Calendar, Clock, User, Download } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, User, Download } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 
 interface AttendanceRecord {
@@ -14,6 +14,13 @@ interface AttendanceRecord {
   workHours: string;
   extraHours: string;
   status: 'present' | 'absent' | 'half_day' | 'leave';
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId?: string;
+  };
 }
 
 interface User {
@@ -23,22 +30,27 @@ interface User {
   role: string;
 }
 
+interface Employee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  employeeId?: string;
+}
+
 export default function AttendancePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedView, setSelectedView] = useState<'day' | 'month'>('day');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchUser();
-    fetchAttendance();
-  }, [currentTime, selectedView]);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me');
       if (response.ok) {
@@ -47,15 +59,27 @@ export default function AttendancePage() {
       } else {
         router.push('/auth/login');
       }
-    } catch (error) {
+    } catch {
       router.push('/auth/login');
     }
-  };
+  }, [router]);
 
-  const fetchAttendance = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
-      const startDate = new Date(currentDate);
-      const endDate = new Date(currentDate);
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        setEmployees(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+    }
+  }, []);
+
+  const fetchAttendance = useCallback(async () => {
+    try {
+      const startDate = new Date(currentTime);
+      const endDate = new Date(currentTime);
       
       if (selectedView === 'month') {
         startDate.setDate(1);
@@ -67,7 +91,17 @@ export default function AttendancePage() {
         to: endDate.toISOString().split('T')[0],
       });
 
-      const response = await fetch(`/api/attendance/me?${params}`);
+      // Add userId filter for admin view if specific employee is selected
+      if (user && user.role !== 'employee' && selectedEmployee !== 'all') {
+        params.set('userId', selectedEmployee);
+      }
+
+      // Choose the right endpoint based on user role
+      const endpoint = user && user.role !== 'employee' 
+        ? `/api/attendance?${params}`
+        : `/api/attendance/me?${params}`;
+
+      const response = await fetch(endpoint);
       if (response.ok) {
         const data = await response.json();
         setAttendanceRecords(data);
@@ -77,16 +111,29 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentTime, selectedView, user, selectedEmployee]);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
+  useEffect(() => {
+    if (user) {
+      if (user.role !== 'employee') {
+        fetchEmployees();
+      }
+      fetchAttendance();
+    }
+  }, [user, fetchEmployees, fetchAttendance]);
 
   const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
+    const newDate = new Date(currentTime);
     if (selectedView === 'day') {
       newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
     } else {
       newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
     }
-    setCurrentDate(newDate);
+    setCurrentTime(newDate);
   };
 
   const formatTime = (timeString: string) => {
@@ -123,17 +170,26 @@ export default function AttendancePage() {
       if (selectedView === 'month') {
         const startDate = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1).toISOString().split('T')[0];
         const endDate = new Date(currentTime.getFullYear(), currentTime.getMonth() + 1, 0).toISOString().split('T')[0];
-        params.set('startDate', startDate);
-        params.set('endDate', endDate);
+        params.set('from', startDate);
+        params.set('to', endDate);
+      } else {
+        // For day view, use current date
+        const currentDate = currentTime.toISOString().split('T')[0];
+        params.set('from', currentDate);
+        params.set('to', currentDate);
       }
       
-      // Add user filter for HR/Admin
-      if (user && user.role !== 'employee') {
-        // For HR/Admin, you might want to export specific user data
-        // For now, export all data for current user role
+      // Add user filter for HR/Admin if specific employee is selected
+      if (user && user.role !== 'employee' && selectedEmployee !== 'all') {
+        params.set('userId', selectedEmployee);
       }
       
-      const response = await fetch(`/api/export/attendance?${params.toString()}`);
+      // Use the appropriate export endpoint
+      const exportEndpoint = user && user.role !== 'employee' 
+        ? `/api/export/attendance?${params.toString()}`
+        : `/api/export/attendance/me?${params.toString()}`;
+      
+      const response = await fetch(exportEndpoint);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -148,7 +204,7 @@ export default function AttendancePage() {
       } else {
         // Error handling without console.log
       }
-    } catch (error) {
+    } catch {
       // Error handling without console.log
     } finally {
       setActionLoading(false);
@@ -242,9 +298,27 @@ export default function AttendancePage() {
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {user.role === 'employee' ? 'For Employees' : 'Attendance'}
-              </h1>
+              <div className="flex items-center space-x-4">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {user.role === 'employee' ? 'For Employees' : 'Attendance'}
+                </h1>
+                
+                {/* Employee Selector for Admin/HR */}
+                {user.role !== 'employee' && (
+                  <select
+                    value={selectedEmployee}
+                    onChange={(e) => setSelectedEmployee(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Employees</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.firstName} {emp.lastName} {emp.employeeId && `(${emp.employeeId})`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               
               {/* Export Button */}
               <button
@@ -287,7 +361,7 @@ export default function AttendancePage() {
                     <option value="month">Month</option>
                   </select>
                   <span className="text-lg font-medium text-gray-900">
-                    {formatDate(currentDate)}
+                    {formatDate(currentTime)}
                   </span>
                 </div>
                 
@@ -344,7 +418,16 @@ export default function AttendancePage() {
                             <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
                               <User className="h-4 w-4 text-gray-600" />
                             </div>
-                            <span className="ml-2 text-sm text-gray-900">Employee</span>
+                            <div className="ml-2">
+                              <span className="text-sm text-gray-900">
+                                {record.user ? `${record.user.firstName} ${record.user.lastName}` : 'Unknown'}
+                              </span>
+                              {record.user?.employeeId && (
+                                <span className="text-xs text-gray-500 block">
+                                  {record.user.employeeId}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                       )}
