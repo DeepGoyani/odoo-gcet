@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { leaves, users } from '@/lib/db/schema';
 import { getAuthCookie, verifyToken } from '@/lib/auth';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { createLeaveNotification } from '@/lib/notifications';
 
 export async function GET(request: NextRequest) {
   try {
@@ -148,6 +149,11 @@ export async function POST(request: NextRequest) {
       reason,
       status: 'pending',
     }).returning();
+
+    // Create notification for HR users
+    if (newLeave.length > 0) {
+      await createLeaveNotification(payload.userId, newLeave[0].id, 'applied');
+    }
 
     return NextResponse.json({
       message: 'Leave request submitted successfully',
