@@ -78,17 +78,27 @@ export async function POST(
       type: 'leave_status',
       title: 'Leave Rejected',
       message: `Your leave from ${leave.start_date} to ${leave.end_date} has been rejected by ${currentUser.firstName} ${currentUser.lastName}.`,
-      link: `/leave`,
+      link: '/leave',
       payload: {
         leaveId: leave.id,
         action: 'rejected',
         approver: `${currentUser.firstName} ${currentUser.lastName}`,
       },
+      created_at: new Date(),
     });
+
+    // Return notification data for toast
+    const notificationData = {
+      userId: leave.user_id,
+      title: 'Leave Rejected',
+      message: `Your leave from ${leave.start_date} to ${leave.end_date} has been rejected.`,
+      type: 'error'
+    };
 
     return NextResponse.json({
       message: 'Leave rejected successfully',
       leave: updatedLeave,
+      toast: notificationData
     });
 
   } catch (error) {
