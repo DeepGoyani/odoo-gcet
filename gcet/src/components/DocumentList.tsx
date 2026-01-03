@@ -73,6 +73,43 @@ export default function DocumentList({ userId, canDelete = false, refreshTrigger
     });
   };
 
+  const handleDelete = async (document: Document) => {
+    if (!confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/uploads/${document.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Trigger toast event
+        window.dispatchEvent(new CustomEvent('showToast', {
+          detail: {
+            title: 'Document Deleted',
+            message: 'The document has been successfully deleted.',
+            type: 'success'
+          }
+        }));
+        
+        // Refresh documents list
+        fetchDocuments();
+      } else {
+        throw new Error('Failed to delete document');
+      }
+    } catch (error) {
+      console.error('Document delete error:', error);
+      window.dispatchEvent(new CustomEvent('showToast', {
+        detail: {
+          title: 'Delete Failed',
+          message: 'Failed to delete document. Please try again.',
+          type: 'error'
+        }
+      }));
+    }
+  };
+
   const getFileIcon = (fileType: string) => {
     return <FileText className="h-5 w-5 text-gray-500" />;
   };
@@ -159,9 +196,7 @@ export default function DocumentList({ userId, canDelete = false, refreshTrigger
               
               {canDelete && (
                 <button
-                  onClick={() => {
-                    // Delete functionality to be implemented
-                  }}
+                  onClick={() => handleDelete(document)}
                   className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete document"
                 >
