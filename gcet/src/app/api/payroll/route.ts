@@ -2,32 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { payrolls, users } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { getAuthCookie, verifyToken } from '@/lib/auth';
+import { authenticateRequest, requireHR } from '@/lib/rbac';
 import { createPayrollNotification } from '@/lib/notifications';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getAuthCookie();
+    const auth = await authenticateRequest(request);
     
-    if (!token) {
+    if (auth.error) {
       return NextResponse.json(
-        { error: 'No authentication token found' },
-        { status: 401 }
+        { error: auth.error },
+        { status: auth.status }
       );
     }
 
-    const payload = verifyToken(token);
-    
-    if (!payload) {
+    const roleCheck = requireHR(auth.user!);
+    if (roleCheck.error) {
       return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
+        { error: roleCheck.error },
+        { status: roleCheck.status }
       );
-    }
-
-    // Check if user is admin or HR
-    if (payload.role !== 'admin' && payload.role !== 'hr') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const allPayrolls = await db
@@ -55,7 +49,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(allPayrolls);
   } catch (error) {
-    console.error('Error fetching payroll data:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -65,27 +58,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = await getAuthCookie();
+    const auth = await authenticateRequest(request);
     
-    if (!token) {
+    if (auth.error) {
       return NextResponse.json(
-        { error: 'No authentication token found' },
-        { status: 401 }
+        { error: auth.error },
+        { status: auth.status }
       );
     }
 
-    const payload = verifyToken(token);
-    
-    if (!payload) {
+    const roleCheck = requireHR(auth.user!);
+    if (roleCheck.error) {
       return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
+        { error: roleCheck.error },
+        { status: roleCheck.status }
       );
-    }
-
-    // Check if user is admin or HR
-    if (payload.role !== 'admin' && payload.role !== 'hr') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -123,7 +110,7 @@ export async function POST(request: NextRequest) {
         total_deductions: totalDeductions.toString(),
         net_salary: netSalary.toString(),
         payable_days: parseInt(payableDays),
-        generated_by: payload.userId,
+        generated_by: auth.user!.id,
       })
       .returning();
 
@@ -138,7 +125,6 @@ export async function POST(request: NextRequest) {
       toast: toastData
     }, { status: 201 });
   } catch (error) {
-    console.error('Error creating payroll:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

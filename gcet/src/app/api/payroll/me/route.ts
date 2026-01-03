@@ -2,14 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { payrolls } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { auth } from '@/lib/auth';
+import { authenticateRequest, requireEmployee } from '@/lib/rbac';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const auth = await authenticateRequest(request);
     
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (auth.error) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: auth.status }
+      );
+    }
+
+    const roleCheck = requireEmployee(auth.user!);
+    if (roleCheck.error) {
+      return NextResponse.json(
+        { error: roleCheck.error },
+        { status: roleCheck.status }
+      );
     }
 
     const userPayrolls = await db
@@ -25,12 +36,11 @@ export async function GET(request: NextRequest) {
         createdAt: payrolls.created_at,
       })
       .from(payrolls)
-      .where(eq(payrolls.user_id, session.user.id))
+      .where(eq(payrolls.user_id, auth.user!.id))
       .orderBy(desc(payrolls.pay_period_start));
 
     return NextResponse.json(userPayrolls);
   } catch (error) {
-    console.error('Error fetching payroll data:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
