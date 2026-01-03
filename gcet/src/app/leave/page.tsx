@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Download } from 'lucide-react';
+import { Search, Download, Plus } from 'lucide-react';
 import { useToastListener } from '@/hooks/useToastListener';
 
 interface LeaveRequest {
