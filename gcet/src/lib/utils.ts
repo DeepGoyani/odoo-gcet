@@ -1,5 +1,8 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { sql } from 'drizzle-orm'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -12,6 +15,41 @@ export function generateEmployeeId(companyName: string, firstName: string, lastN
   const serial = serialNumber.toString().padStart(4, '0');
   
   return `${companyPrefix}${namePrefix}${yearPrefix}${serial}`;
+}
+
+export async function generateUniqueEmployeeId(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const yearPrefix = `EMP-${currentYear}`;
+  
+  try {
+    // Get all employee IDs for current year and find the max serial number
+    const allUsers = await db.select({
+      employeeId: users.employee_id
+    }).from(users)
+      .where(sql`employee_id LIKE ${yearPrefix + '%'}`);
+    
+    let maxSerial = 0;
+    
+    allUsers.forEach((user: { employeeId?: string | null }) => {
+      if (user.employeeId) {
+        const parts = user.employeeId.split('-');
+        if (parts.length === 2) {
+          const serial = parseInt(parts[1]);
+          if (!isNaN(serial) && serial > maxSerial) {
+            maxSerial = serial;
+          }
+        }
+      }
+    });
+    
+    const nextSerial = maxSerial + 1;
+    return `${yearPrefix}-${nextSerial.toString().padStart(4, '0')}`;
+    
+  } catch (error) {
+    // Fallback to simple increment if query fails
+    const randomSerial = Math.floor(Math.random() * 9999) + 1;
+    return `EMP-${currentYear}-${randomSerial.toString().padStart(4, '0')}`;
+  }
 }
 
 export function formatCurrency(amount: number | string): string {
