@@ -77,10 +77,20 @@ jobs:
       working-directory: gcet/
       run: npm ci
 
+    - name: Setup database
+      working-directory: gcet/
+      run: |
+        npx prisma generate
+        npx prisma db push --force-reset
+
     - name: Run tests
       working-directory: gcet/
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        NEXTAUTH_URL: http://localhost:3000
+        NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        NODE_ENV: test
       run: npm test
 
   build:
