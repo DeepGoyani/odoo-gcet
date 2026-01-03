@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Bell, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Search, Bell, Clock, CheckCircle, XCircle, AlertCircle, Check, Trash2 } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -40,7 +40,7 @@ export default function NotificationsPage() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
         method: 'PATCH',
       });
       if (response.ok) {
@@ -52,6 +52,44 @@ export default function NotificationsPage() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
+      if (unreadIds.length === 0) return;
+      
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notificationIds: unreadIds }),
+      });
+      
+      if (response.ok) {
+        setNotifications(prev => 
+          prev.map(n => ({ ...n, isRead: true }))
+        );
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setNotifications(prev => 
+          prev.filter(n => n.id !== notificationId)
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
     }
   };
 
@@ -208,8 +246,19 @@ export default function NotificationsPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-              <div className="text-sm text-gray-500">
-                {filteredNotifications.length} {filter === 'all' ? 'notifications' : `${filter} notifications`}
+              <div className="flex items-center space-x-4">
+                <div className="text-sm text-gray-500">
+                  {filteredNotifications.length} {filter === 'all' ? 'notifications' : `${filter} notifications`}
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="flex items-center space-x-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>Mark all as read</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -257,24 +306,32 @@ export default function NotificationsPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center space-x-2">
-                        {!notification.isRead && (
-                          <button
-                            onClick={() => markAsRead(notification.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Mark as read
-                          </button>
-                        )}
-                        {notification.link && (
-                          <Link
-                            href={notification.link}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                            onClick={() => markAsRead(notification.id)}
-                          >
-                            View Details
-                          </Link>
-                        )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {!notification.isRead && (
+                            <button
+                              onClick={() => markAsRead(notification.id)}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                              Mark as read
+                            </button>
+                          )}
+                          {notification.link && (
+                            <Link
+                              href={notification.link}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              onClick={() => markAsRead(notification.id)}
+                            >
+                              View Details
+                            </Link>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => deleteNotification(notification.id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
