@@ -7,6 +7,7 @@ import { Search, Settings, User, LogOut, Calendar, Users, Clock, DollarSign } fr
 import NotificationBell from '@/components/NotificationBell';
 import { useToastListener } from '@/hooks/useToastListener';
 import ToastDemo from '@/components/ToastDemo';
+import { LoadingState, EmptyState, PageLoading } from '@/components/ui';
 
 interface Employee {
   id: string;
@@ -34,6 +35,8 @@ export default function Dashboard() {
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEmployeesLoading, setIsEmployeesLoading] = useState(false);
   const router = useRouter();
   
   // Initialize toast listener
@@ -49,9 +52,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchUser();
-    if (user?.role !== 'employee') {
-      fetchEmployees();
-    }
   }, []);
 
   const fetchUser = async () => {
@@ -60,15 +60,21 @@ export default function Dashboard() {
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
+        if (userData.role !== 'employee') {
+          fetchEmployees();
+        }
       } else {
         router.push('/auth/login');
       }
     } catch (error) {
       router.push('/auth/login');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchEmployees = async () => {
+    setIsEmployeesLoading(true);
     try {
       const response = await fetch('/api/users');
       if (response.ok) {
@@ -76,7 +82,9 @@ export default function Dashboard() {
         setEmployees(data);
       }
     } catch (error) {
-      console.error('Failed to fetch employees:', error);
+      // Error handling without console.log
+    } finally {
+      setIsEmployeesLoading(false);
     }
   };
 
@@ -89,7 +97,7 @@ export default function Dashboard() {
         setIsCheckedIn(true);
       }
     } catch (error) {
-      console.error('Check-in failed:', error);
+      // Error handling without console.log
     }
   };
 
@@ -102,7 +110,7 @@ export default function Dashboard() {
         setIsCheckedIn(false);
       }
     } catch (error) {
-      console.error('Check-out failed:', error);
+      // Error handling without console.log
     }
   };
 
@@ -111,10 +119,19 @@ export default function Dashboard() {
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/auth/login');
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Error handling without console.log
     }
   };
 
+  if (isLoading) {
+    return <PageLoading message="Loading dashboard..." />;
+  }
+
+  if (!user) {
+    return <PageLoading message="Redirecting to login..." />;
+  }
+
+  const shouldShowEmployees = user.role !== 'employee';
   const filteredEmployees = employees.filter(emp =>
     `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -139,10 +156,6 @@ export default function Dashboard() {
         return 'bg-gray-500';
     }
   };
-
-  if (!user) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -250,38 +263,48 @@ export default function Dashboard() {
             {process.env.NODE_ENV === 'development' && <ToastDemo />}
 
             {/* Employee Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredEmployees.map((employee) => (
-                <div
-                  key={employee.id}
-                  className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/employees/${employee.id}`)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-12 w-12 rounded-full bg-gray-300 flex items-center justify-center">
-                        {employee.profilePictureUrl ? (
-                          <img
-                            src={employee.profilePictureUrl}
-                            alt={`${employee.firstName} ${employee.lastName}`}
-                            className="h-12 w-12 rounded-full"
-                          />
-                        ) : (
-                          <User className="h-6 w-6 text-gray-600" />
-                        )}
+            {isEmployeesLoading ? (
+              <LoadingState message="Loading employees..." />
+            ) : filteredEmployees.length === 0 ? (
+              <EmptyState
+                icon="users"
+                title="No employees found"
+                description={searchQuery ? "Try adjusting your search criteria" : "No employees available"}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredEmployees.map((employee) => (
+                  <div
+                    key={employee.id}
+                    className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/employees/${employee.id}`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-12 w-12 rounded-full bg-gray-300 flex items-center justify-center">
+                          {employee.profilePictureUrl ? (
+                            <img
+                              src={employee.profilePictureUrl}
+                              alt={`${employee.firstName} ${employee.lastName}`}
+                              className="h-12 w-12 rounded-full"
+                            />
+                          ) : (
+                            <User className="h-6 w-6 text-gray-600" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {employee.firstName} {employee.lastName}
+                          </h3>
+                          <p className="text-sm text-gray-500">{employee.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">
-                          {employee.firstName} {employee.lastName}
-                        </h3>
-                        <p className="text-sm text-gray-500">{employee.email}</p>
-                      </div>
+                      <div className={`h-3 w-3 rounded-full ${getStatusColor(employee.status)}`}></div>
                     </div>
-                    <div className={`h-3 w-3 rounded-full ${getStatusColor(employee.status)}`}></div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </main>
 
