@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
+import { useToastListener } from '@/hooks/useToastListener';
 
 interface LeaveRequest {
   id: string;
@@ -32,6 +33,9 @@ export default function LeavePage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Initialize toast listener
+  useToastListener();
 
   const fetchUser = async () => {
     try {
@@ -79,7 +83,15 @@ export default function LeavePage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
         fetchLeaveRequests();
+        
+        // Show toast notification if returned by API
+        if (data.toast) {
+          const { showSuccessToast } = await import('@/contexts/ToastContext').then(mod => ({ showSuccessToast: mod.useToast().showSuccessToast }));
+          // We'll need to call this from a component that has access to the hook
+          window.dispatchEvent(new CustomEvent('showToast', { detail: data.toast }));
+        }
       }
     } catch (error) {
       console.error('Failed to approve leave:', error);
@@ -99,7 +111,13 @@ export default function LeavePage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
         fetchLeaveRequests();
+        
+        // Show toast notification if returned by API
+        if (data.toast) {
+          window.dispatchEvent(new CustomEvent('showToast', { detail: data.toast }));
+        }
       }
     } catch (error) {
       console.error('Failed to reject leave:', error);
