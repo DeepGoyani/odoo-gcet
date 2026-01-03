@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Bell, Settings, User, LogOut, Calendar, Users, Clock, DollarSign } from 'lucide-react';
+import { Search, Settings, User, LogOut, Calendar, Users, Clock, DollarSign } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
 
 interface Employee {
   id: string;
@@ -30,7 +31,6 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
 
@@ -192,13 +192,7 @@ export default function Dashboard() {
               </div>
 
               <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 text-gray-400 hover:text-gray-600"
-                >
-                  <Bell className="h-6 w-6" />
-                  <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
-                </button>
+                <NotificationBell userId={user?.id || ''} />
               </div>
 
               <div className="relative">
