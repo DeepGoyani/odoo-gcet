@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Calendar, DollarSign, Download, FileText } from 'lucide-react';
+import { Search, Calendar, Users, FileText, Download } from 'lucide-react';
 
 interface PayrollRecord {
   id: string;

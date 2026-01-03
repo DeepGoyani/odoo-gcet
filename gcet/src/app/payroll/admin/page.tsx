@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Plus, Calendar, DollarSign, Users, FileText, Download } from 'lucide-react';
+import { Search, Plus, Calendar, Users, FileText, Download } from 'lucide-react';
 
 interface PayrollRecord {
   id: string;
@@ -29,13 +29,14 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  employeeId?: string;
 }
 
 export default function AdminPayrollPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
