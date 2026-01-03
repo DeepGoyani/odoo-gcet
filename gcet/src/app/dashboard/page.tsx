@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Settings, User, LogOut, Calendar, Users, Clock, DollarSign } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
+import { useToastListener } from '@/hooks/useToastListener';
+import ToastDemo from '@/components/ToastDemo';
 
 interface Employee {
   id: string;
@@ -33,6 +35,9 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
+  
+  // Initialize toast listener
+  useToastListener();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -240,6 +245,9 @@ export default function Dashboard() {
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+
+            {/* Toast Demo - Remove in production */}
+            {process.env.NODE_ENV === 'development' && <ToastDemo />}
 
             {/* Employee Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
