@@ -1,0 +1,250 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  logo        String?  // URL or path to logo file
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]   // All users (HR and employees) belonging to this company
+
+  @@map("companies")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  employeeId String? @unique  // Auto-generated Login ID for employees
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  role      Role     @default(EMPLOYEE)
+  
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  
+  emailVerified Boolean  @default(false)
+  verificationToken String?
+  verificationTokenExpiry DateTime?
+  
+  // Profile relations
+  profile       EmployeeProfile?
+  jobDetails    JobDetails?
+  salaryStructure SalaryStructure?
+  documents     Document[]
+  attendance    Attendance[]
+  leaveRequests LeaveRequest[]
+  payrolls      Payroll[]
+  notifications Notification[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model EmployeeProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  profilePicture String?
+  dateOfBirth    DateTime?
+  gender          String?
+  maritalStatus  String?
+  nationality     String?
+  personalEmail   String?
+  residingAddress String?
+  
+  // About section
+  about           String?
+  jobLoves        String?
+  interestsHobbies String?
+  
+  // Bank details
+  accountNumber   String?
+  bankName        String?
+  ifscCode        String?
+  panNumber       String?
+  uanNumber       String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("employee_profiles")
+}
+
+model JobDetails {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  jobPosition String?
+  department  String?
+  manager     String?
+  workLocation String?
+  dateOfJoining DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("job_details")
+}
+
+model SalaryStructure {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Wage information
+  monthlyWage     Float?
+  yearlyWage      Float?
+  workingDaysPerWeek Int?
+  overtime        Float?
+  
+  // Salary components
+  basicSalary           Float?
+  basicSalaryPercent    Float?
+  houseRentAllowance    Float?
+  hraPercent            Float?
+  standardAllowance     Float?
+  performanceBonus      Float?
+  performanceBonusPercent Float?
+  leaveTravelAllowance  Float?
+  ltaPercent            Float?
+  fuelAllowance         Float?
+  
+  // PF Contribution
+  employeePF            Float?
+  employeePFPercent     Float?
+  employerPF            Float?
+  employerPFPercent     Float?
+  
+  // Tax Deductions
+  professionalTax       Float?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("salary_structures")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fileName    String
+  fileType    String
+  fileUrl     String
+  documentType String? // Resume, Certificate, etc.
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date      DateTime @default(now())
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    String?  // Present, Absent, Half Day, etc.
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("attendances")
+}
+
+model LeaveRequest {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type          String   // PAID, SICK, UNPAID
+  startDate     DateTime
+  endDate       DateTime
+  days          Float?
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reason        String?
+  adminComment  String?
+  attachmentUrl String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("leave_requests")
+}
+
+model Payroll {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  month     Int
+  year      Int
+  status    String   @default("PENDING") // PENDING, PAID
+  
+  // Amounts calculated for this specific month
+  basicSalary    Float
+  allowances     Float
+  deductions     Float
+  netSalary      Float
+  
+  slipUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@map("payrolls")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   // LEAVE_UPDATE, PAYROLL_GENERATED, etc.
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// For tracking employee ID serial numbers per year
+model CompanySettings {
+  id    String @id @default(cuid())
+  companyId String
+  year  Int
+  lastSerialNumber Int @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, year])
+  @@map("company_settings")
+}
